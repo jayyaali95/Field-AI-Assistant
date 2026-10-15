@@ -21,17 +21,31 @@ local model in the image) for a corpus this small.
 Postgres splits `E-31` into `e` and `-31`, which is useless. Before indexing and before querying, codes with a digit and
 a hyphen or dot are collapsed (`E-31` -> `e31`, `HCP350-241187` -> `hcp350241187`). Plain words keep English stemming.
 
-The query is an OR of all terms, ranked with `ts_rank`. Postgres ranking has no IDF, so a chunk that says "check" ten
-times can beat a rarer exact match. In practice the codes carry the query. This is the first thing I'd replace (see
-scaling).
+The query is an OR of all terms. Ranking is BM25, written in SQL on top of the Postgres full-text index:
+- Postgres' own `ts_rank` has no IDF. With it, "casing" (stemmed to "case") matched every Salesforce case as strongly
+  as `hcp200` matched the HCP-200 manual, and the clearance question got case records. Term document counts come from
+  `ts_stat`, snapshotted into a materialized view at ingest.
+- Term frequency comes from the positions stored in the tsvector.
+- A term that also appears in the title or section heading counts double (BM25F-style), so "HCP-200" prefers the
+  HCP-200 manual over HCP-350 pages that say "clearance" more often.
+- Length normalization is low (b = 0.2). Chunks range from one CSV row to a whole procedure section, and with the
+  usual 0.75 the HV-PROC-07 procedure section lost to its own revision history.
+- At most 4 chunks per document, 20 in total, so one big export can't fill the context.
+
+These settings were picked by checking, for each eval question, whether the sources the reference answer depends on
+are retrieved for that user. That check is a test (`tests/test_retrieval_corpus.py`) so ranking changes can't quietly
+break it. Ten questions is a small set to tune on; the risk of overfitting is real, which is why I kept the changes
+to standard BM25 ideas instead of per-question tricks.
 
 Asset IDs are resolved through the fleet register before searching, so "FRS-P-0031" also searches for `HCP-350` and
-its serial. Without this the torque question finds the IOM but not the bulletin that overrides it.
+its serial. Without this the torque question finds the IOM but not the bulletin that overrides it. The last four
+digits are searched too, because people write "0142 tripped again" in chat and site notes.
 
 ## Chunking: by the unit a technician would cite
 
 - PDF: one chunk per page, cited as `p. N`.
-- DOCX procedures: one chunk per heading section, tables kept in place inside their section.
+- DOCX procedures: one chunk per top-level section ("6. Procedure"), with subsections and step tables kept inside it
+  in order. Splitting at 6.1, 6.2... scattered a procedure across chunks and the reset steps got lost.
 - Confluence: one chunk per `h2/h3` section. The page's "last modified" date goes in the source header so the model can
   tell a 2024 wiki page from a 2026 manual.
 - Email: one chunk per message in the thread.
@@ -44,11 +58,14 @@ its serial. Without this the torque question finds the IOM but not the bulletin 
   Restricted text never goes into the prompt, so a prompt injection or a model mistake can't leak it.
 - A file missing from permissions.json is not indexed at all (fail closed). This catches
   `VRS-110-VFD-quick-reset-unofficial.html`, a personal copy of the HV reset procedure that also skips the insulation test.
-- When restricted documents match the question, the copilot says that a document needing e.g. HV certification
-  covers it, and that the work needs a certified technician. It does not quote, summarise or name it. Reason: a tech
-  who is told "nothing covers this" might improvise; a tech who is told "this is HV work" stops and raises a work order,
-  which is what FS-STD-001 6.4 asks for. The cost is that the user learns a restricted document exists. Titles of these
-  procedures are already listed in FS-STD-001, which everyone can read, so that is not new information.
+- When a document restricted by a certification the user lacks matches the question better than anything they can
+  see, the copilot is told which certification is missing (e.g. `cert-hv`), nothing else. It says the work needs that
+  certification and drafts a work order for a certified technician. It does not quote, summarise or name the document.
+  Reason: a tech who is told "nothing covers this" might improvise; a tech who is told "this is HV work" stops and
+  raises a work order, which is what FS-STD-001 6.4 asks for. The cost is that the user learns a restricted procedure
+  exists; their titles are already listed in FS-STD-001, which everyone can read.
+- Only certifications are announced. Region, equipment family and team-lead restrictions are not: telling a conveyor
+  tech that "a pump document matches" is noise, and lead-only pages name customers and individual jobs.
 - Even with permitted sources, the prompt tells the model not to give steps for certified work the user isn't
   certified for. Permissions are the hard guarantee; the prompt is the second line.
 
@@ -115,8 +132,9 @@ person can check the grading.
 
 ## At 100,000 documents
 
-- Ranking breaks first: no IDF, OR queries return huge candidate sets. Move to BM25 (ParadeDB `pg_search` or
-  OpenSearch) plus vector search, merged with reciprocal rank fusion, and a reranker on the top 50.
+- Ranking breaks first. The hand-written BM25 unnests every matching chunk's tsvector per query, and OR queries
+  match a large share of the corpus. Fine for 1,500 chunks, not for millions. Move to a real BM25 index (ParadeDB
+  `pg_search` or OpenSearch) plus vector search, merged with reciprocal rank fusion, and a reranker on the top 50.
 - Ingestion: single process, full rebuild, OCR inline. Needs a queue, workers, incremental updates by file hash, and
   permissions synced from the source systems instead of one JSON file.
 - Permission filter as `required_groups <@ user_groups` on every chunk is fine in Postgres with an index, but with ACLs

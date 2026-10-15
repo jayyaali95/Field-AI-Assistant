@@ -64,3 +64,10 @@ docker compose run --rm api pytest
 ```
 
 Tests use a separate `copilot_test` database, so they don't touch the real index or work orders.
+
+`tests/test_retrieval_corpus.py` indexes the real corpus and checks that each eval question retrieves the sources its
+reference answer needs. It takes about two minutes (OCR). For a quick run:
+
+```bash
+docker compose run --rm api pytest --ignore tests/test_retrieval_corpus.py
+```

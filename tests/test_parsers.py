@@ -41,8 +41,9 @@ def test_scanned_pdf_page_is_ocred(tmp_path):
     assert "0.38" in chunks[0].text and "0.50" in chunks[0].text
 
 
-def test_docx_sections_keep_their_tables(tmp_path):
+def test_docx_top_level_sections_keep_subsections_and_tables(tmp_path):
     document = docx.Document()
+    document.add_heading("6. Procedure", level=1)
     document.add_heading("6.2 Isolate", level=2)
     document.add_paragraph("Isolate the compressor.")
     table = document.add_table(rows=1, cols=2)
@@ -54,21 +55,25 @@ def test_docx_sections_keep_their_tables(tmp_path):
     document.save(path)
 
     chunks = {c.location: c.text for c in parse_file(path).chunks}
-    assert "Step 7 | Measure TP1 to TP2" in chunks["6.2 Isolate"]
+    assert list(chunks) == ["6. Procedure", "7. Records"]
+    assert "6.2 Isolate" in chunks["6. Procedure"]
+    assert "Step 7 | Measure TP1 to TP2" in chunks["6. Procedure"]
     assert "TP1" not in chunks["7. Records"]
 
 
-def test_docx_numbered_normal_paragraph_is_a_heading(tmp_path):
-    # Kyltek work instructions use Normal style for headings like "5.6 Vulling en lekcontrole [F]".
+def test_docx_numbered_normal_paragraphs_are_sections(tmp_path):
+    # Kyltek work instructions use Normal style for headings.
     document = docx.Document()
+    document.add_paragraph("5. Werkwijze / Method")
     document.add_paragraph("5.6 Vulling en lekcontrole [F]  (Charge and leak check [F])")
     document.add_paragraph("5.6.5\t[F] If no leak is found, top up.")
+    document.add_paragraph("6. Registratie / Recording")
     path = tmp_path / "wi.docx"
     document.save(path)
 
     chunks = parse_file(path).chunks
-    assert chunks[0].location.startswith("5.6 Vulling")
-    assert "top up" in chunks[0].text
+    assert [c.location for c in chunks] == ["5. Werkwijze / Method", "6. Registratie / Recording"]
+    assert "5.6 Vulling" in chunks[0].text and "top up" in chunks[0].text
 
 
 def test_confluence_sections_and_modified_date(tmp_path):

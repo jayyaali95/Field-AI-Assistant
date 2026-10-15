@@ -76,14 +76,16 @@ def ingest(conn: psycopg.Connection, data_dir: Path) -> Report:
         ).fetchone()["id"]
         with conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO chunks (document_id, location, text, tsv) VALUES (%s, %s, %s,"
-                " setweight(to_tsvector('english', %s), 'A') || to_tsvector('english', %s))",
+                "INSERT INTO chunks (document_id, location, text, tsv)"
+                " VALUES (%s, %s, %s, setweight(to_tsvector('english', %s), 'A') || to_tsvector('english', %s))",
                 [
                     (doc_id, c.location, c.text, normalize(f"{meta['title']} {c.location}"), normalize(c.text))
                     for c in parsed.chunks
                 ],
             )
         report.indexed[rel] = len(parsed.chunks)
+    conn.execute("REFRESH MATERIALIZED VIEW term_stats")
+    conn.execute("REFRESH MATERIALIZED VIEW corpus_stats")
     conn.commit()
     return report
 

@@ -1,3 +1,4 @@
+import json
 import os
 
 import psycopg
@@ -23,6 +24,22 @@ def database():
     with db.connect() as conn:
         db.init_schema(conn)
     return TEST_URL
+
+
+@pytest.fixture
+def corpus(tmp_path):
+    """Build a small data dir: corpus({"corpus/x.html": (html, ["cert-hv"]), ...}) -> path."""
+    def build(files: dict[str, tuple[str, list[str]]]):
+        permissions = {}
+        for rel, (content, groups) in files.items():
+            path = tmp_path / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+            if groups is not None:  # None = leave it out of permissions.json
+                permissions[rel] = {"title": path.stem, "source_system": "confluence", "required_groups": groups}
+        (tmp_path / "permissions.json").write_text(json.dumps({"documents": permissions}))
+        return tmp_path
+    return build
 
 
 @pytest.fixture

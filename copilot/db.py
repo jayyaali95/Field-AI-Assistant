@@ -23,6 +23,13 @@ CREATE TABLE IF NOT EXISTS chunks (
 );
 CREATE INDEX IF NOT EXISTS chunks_tsv_idx ON chunks USING GIN (tsv);
 
+-- Statistics for BM25 ranking in search. Refreshed at the end of every ingest.
+CREATE MATERIALIZED VIEW IF NOT EXISTS term_stats AS
+    SELECT word, ndoc FROM ts_stat('SELECT tsv FROM chunks');
+CREATE UNIQUE INDEX IF NOT EXISTS term_stats_word_idx ON term_stats (word);
+CREATE MATERIALIZED VIEW IF NOT EXISTS corpus_stats AS
+    SELECT count(*) AS total, coalesce(avg(length(tsv)), 1) AS avg_len FROM chunks;
+
 CREATE TABLE IF NOT EXISTS work_orders (
     id           SERIAL PRIMARY KEY,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),

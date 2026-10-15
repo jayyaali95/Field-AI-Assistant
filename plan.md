@@ -17,11 +17,12 @@ Three containers in docker compose. Ingestion is a CLI in the api package and ru
 ## How a question is answered
 
 1. Look up the user and their groups (users.json).
-2. If the question names an asset (e.g. `FRS-P-0031`), pull its fleet register row and add its model and serial to the query.
-3. Full-text search in Postgres, filtered in SQL to documents whose required groups are all in the user's groups.
-   Max 4 chunks per document so one big CSV can't push everything else out.
-4. Run the same search without the filter, only to find out whether restricted documents also match. The model is told
-   which groups are missing, never what those documents say.
+2. If the question names an asset (e.g. `FRS-P-0031`), pull its fleet register row and add its model, serial and
+   short number (`0031`) to the query.
+3. BM25 search over the Postgres full-text index, filtered in SQL to documents whose required groups are all in the
+   user's groups. Top 20 chunks, max 4 per document so one big CSV can't push everything else out.
+4. Run the same search without the filter, only to find out whether a document restricted by a certification the user
+   lacks matches better. The model is told which certification is missing, never what the document says.
 5. The LLM gets the permitted chunks, numbered `[S1]..[Sn]`, and returns JSON: covered or not, answer with `[S#]` after
    each claim, optional work order draft.
 6. Citations are checked against what was actually sent. A "covered" answer with no valid citation is turned into

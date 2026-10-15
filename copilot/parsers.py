@@ -97,10 +97,13 @@ def _ocr(page) -> str:
 
 # ---------- DOCX ----------
 
-NUMBERED_HEADING = re.compile(r"^\d+(\.\d+)*\.?\s+\S.{0,80}$")
+# "5. Werkwijze / Method" is a top-level section, "5.1 Eerste beoordeling" is not.
+NUMBERED_SECTION = re.compile(r"^\d+\.?\s+\S.{0,80}$")
 
 
 def parse_docx(path: Path) -> Parsed:
+    """One chunk per top-level section. Subsections (6.1, 6.2...) stay inside it with their headings,
+    so a whole procedure ("6. Procedure", steps 1-18 with their tables) comes back as one unit."""
     document = docx.Document(str(path))
     chunks: list[Chunk] = []
     location, lines = "Header", []
@@ -118,7 +121,7 @@ def parse_docx(path: Path) -> Parsed:
             if not text:
                 continue
             style = para.style.name if para.style is not None else ""
-            if _is_heading(text, style):
+            if _is_section(text, style):
                 flush()
                 location, lines = text, []
             lines.append(text)
@@ -136,11 +139,11 @@ def parse_docx(path: Path) -> Parsed:
     return Parsed(chunks)
 
 
-def _is_heading(text: str, style: str) -> bool:
-    if style.startswith("Heading") or style == "Title":
+def _is_section(text: str, style: str) -> bool:
+    if style in ("Heading 1", "Title"):
         return True
-    # Legacy Kyltek instructions use Normal style with "5.1 Title" lines.
-    return style == "Normal" and "\t" not in text and bool(NUMBERED_HEADING.match(text)) and not text.endswith(".")
+    # Legacy Kyltek instructions use Normal style for headings, e.g. "5. Werkwijze / Method".
+    return style == "Normal" and "\t" not in text and bool(NUMBERED_SECTION.match(text)) and not text.endswith(".")
 
 
 # ---------- Confluence HTML ----------
