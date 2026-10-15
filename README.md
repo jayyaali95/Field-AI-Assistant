@@ -71,6 +71,27 @@ ANTHROPIC_API_KEY=...
 or `LLM_MODEL=openai:gpt-5` with `OPENAI_API_KEY`. Other providers need their `langchain-<provider>` package added to
 `requirements.txt`.
 
+## Eval
+
+```bash
+docker compose run --rm api python -m copilot.eval            # all 10 questions
+docker compose run --rm api python -m copilot.eval q05 q06    # some of them
+```
+
+Each question goes through the same code path as the UI, asked as the technician named in `questions.json`. An LLM
+judge compares the answer with the reference answer:
+
+- **correct**: every fact the technician needs to act correctly and safely is there (values, part numbers, which
+  bulletin or revision applies, conditions, required certification, escalation, the "don't do X" parts), nothing
+  contradicts the reference, and nothing the reference rules out (e.g. reset steps for someone without HV). Wording
+  and extra correct detail don't matter.
+- **partially correct**: right direction, nothing unsafe, but a required fact is missing.
+- **incorrect**: a required action is missing or wrong, or a value contradicts the reference.
+
+Only "correct" counts toward the score. The judge's reasons, the answers, citations and work order drafts are saved
+to `eval_results/eval-<timestamp>.json`. The judge defaults to the answering model; set `JUDGE_MODEL` to grade with a
+different one.
+
 ## Tests
 
 ```bash

@@ -27,6 +27,7 @@ services:
       TEST_DATABASE_URL: postgresql://copilot:copilot@db:5432/copilot_test
     volumes:
       - ./data:/data:ro
+      - ./eval_results:/app/eval_results
     ports:
       - "8000:8000"
     depends_on:
