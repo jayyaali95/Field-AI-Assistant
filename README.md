@@ -44,6 +44,18 @@ docker compose run --rm api python -m copilot.ingest
 
 The output lists every file that was skipped and why (empty, not in permissions.json, duplicate, unreadable pages).
 
+## API
+
+- `GET /users`: the technicians from `users.json`
+- `POST /ask` with `{"user_id": "u03", "question": "TAC-C-0143 tripped on E-31. How do I reset it?"}`: returns
+  `covered`, `answer` (with `[S#]` markers), `citations` (title, location, path, excerpt per marker),
+  `missing_certifications` and a `work_order` draft or null
+
+```bash
+curl -s localhost:8000/ask -H 'content-type: application/json' \
+  -d '{"user_id": "u03", "question": "TAC-C-0143 tripped on E-31. How do I reset it?"}'
+```
+
 ## LLM
 
 Set `LLM_MODEL` in `.env` as `<provider>:<model>` and the provider's key, for example:

@@ -90,6 +90,18 @@ The LLM returns structured JSON (covered, answer, work order). Every claim ends 
 citations are checked: unknown ones are dropped, and an answer that claims coverage with no valid citation becomes
 "not covered". If search finds nothing permitted, no LLM call is made.
 
+The prompt gets the technician's name, title and groups with their meaning (so the model knows they are, say, not HV
+certified), today's date (certificates and campaigns expire), the missing-certification note if any, and the sources,
+each with title, location, source system and wiki "last modified" date. One call per question, no chat history.
+
+The rules in the system prompt are the ones a senior engineer would apply, taken from FS-STD-001 and the Work Order
+Writing Guide: cite everything, don't answer for a different model, the precedence order for conflicting sources,
+check serials against bulletin ranges, no certified steps for uncertified users, when to draft a work order.
+
+The model's citations are checked but its claims are not: a sentence can carry a valid `[S3]` and still misstate S3.
+Checking each claim against its source (a second LLM pass or string matching on values and part numbers) is on the
+"another week" list.
+
 ## LLM provider
 
 Provider-agnostic through LangChain: `init_chat_model(LLM_MODEL)` with `LLM_MODEL="<provider>:<model>"`, and
