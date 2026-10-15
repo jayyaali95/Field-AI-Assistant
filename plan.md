@@ -9,7 +9,7 @@ A supervisor approves the work order before it goes anywhere.
 ```
 ui (Streamlit)  ->  api (FastAPI)  ->  db (Postgres: documents, chunks, full-text index, work orders)
                          |
-                         +-> Claude API (answer + work order draft, eval grading)
+                         +-> LLM via LangChain, any provider (answer + work order draft, eval grading)
 ```
 
 Three containers in docker compose. Ingestion is a CLI in the api package and runs once on api start if the index is empty.
@@ -22,7 +22,7 @@ Three containers in docker compose. Ingestion is a CLI in the api package and ru
    Max 4 chunks per document so one big CSV can't push everything else out.
 4. Run the same search without the filter, only to find out whether restricted documents also match. The model is told
    which groups are missing, never what those documents say.
-5. Claude gets the permitted chunks, numbered `[S1]..[Sn]`, and returns JSON: covered or not, answer with `[S#]` after
+5. The LLM gets the permitted chunks, numbered `[S1]..[Sn]`, and returns JSON: covered or not, answer with `[S#]` after
    each claim, optional work order draft.
 6. Citations are checked against what was actually sent. A "covered" answer with no valid citation is turned into
    "not covered".
@@ -39,5 +39,5 @@ Three containers in docker compose. Ingestion is a CLI in the api package and ru
 4. **Answering**: prompt, structured output, citation validation, no-coverage path. Tests with a fake LLM.
 5. **Work orders**: draft storage, approve/reject API, lead-only approval. Tests.
 6. **UI**: user picker, ask screen with sources, work order list with approve/reject.
-7. **Eval**: run the 10 questions, grade with Claude against the reference answers, print a score and save results.
-8. **Docs**: README run steps (docker and virtualenv), where AI helped, scaling notes.
+7. **Eval**: run the 10 questions, grade with the LLM against the reference answers, print a score and save results.
+8. **Docs**: README run steps (Docker), where AI helped, scaling notes.

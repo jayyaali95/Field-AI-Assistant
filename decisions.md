@@ -1,8 +1,9 @@
 # Decisions and tradeoffs
 
-## Architecture: UI, API, Postgres, Claude
+## Architecture: UI, API, Postgres, LLM
 
-Three services. The UI only talks to the API, the API owns the database and the LLM key. That keeps permissions in one
+Three services, run only through docker compose (tests too: `docker compose run --rm api pytest`). Same environment
+for everyone, and Tesseract and Postgres come with it. The UI only talks to the API, the API owns the database and the LLM key. That keeps permissions in one
 place: the UI can't ask for a document it shouldn't see because it never touches the data.
 
 Postgres does two jobs: full-text search over the chunks and storage for work orders. One database instead of a search
@@ -14,8 +15,8 @@ field app would be a proper mobile web app.
 ## Retrieval: keyword search, no embeddings
 
 Technician questions are full of exact codes: `E-31`, `P-07`, `HCP-500`, `TAC-C-0143`, part numbers. Keyword search
-is very good at those and embeddings are not. Anthropic has no embeddings API, so embeddings would also mean a second
-provider or a local model in the image.
+is very good at those and embeddings are not. Embeddings would also need a second model (an embedding API or a
+local model in the image) for a corpus this small.
 
 Postgres splits `E-31` into `e` and `-31`, which is useless. Before indexing and before querying, codes with a digit and
 a hyphen or dot are collapsed (`E-31` -> `e31`, `HCP350-241187` -> `hcp350241187`). Plain words keep English stemming.
@@ -56,7 +57,11 @@ its serial. Without this the torque question finds the IOM but not the bulletin 
 - Empty file (`Inspection_Checklist_Q3_FINAL.docx`): skipped, reported.
 - Exact duplicate (`NK600_manual_final_v2.pdf` = `Nordkyl_NK-600_Service_Manual_RevC.pdf`): indexed once, keeping the
   manual library copy. Only deduped when both copies have the same permissions.
-- Scanned 1998 HCP-200 manual: OCR with Tesseract for pages with no text layer.
+- Scanned 1998 HCP-200 manual: OCR with Tesseract for pages with no text layer. Grayscale plus a median filter to
+  remove scanner speckle, and `--psm 6` so table rows stay on one line. With the default settings the value column of
+  the technical data table was lost, including the clearance spec. Still imperfect: the casing torque value on p. 3
+  doesn't survive. Better OCR (or a vision model) is on the "another week" list.
+- Partly corrupt PDF (`Vastra_SB-2026-015`, page 2 won't decode): readable pages are indexed, the bad page is reported.
 - Conflicting sources (Rev B vs Rev C, IOM vs bulletin, KT-WI-14 vs SOP-020, wiki vs manual): handled in the prompt
   with an explicit order: bulletin for its serial range, then the newest OEM manual, then Corvane controlled procedures,
   then legacy Kyltek instructions, then wiki, chat and email. The model is asked to name the conflict, not hide it.
@@ -64,12 +69,25 @@ its serial. Without this the torque question finds the IOM but not the bulletin 
 
 ## Answer format
 
-Claude returns structured JSON (covered, answer, work order). Every claim ends with `[S#]`. After the call the
+The LLM returns structured JSON (covered, answer, work order). Every claim ends with `[S#]`. After the call the
 citations are checked: unknown ones are dropped, and an answer that claims coverage with no valid citation becomes
 "not covered". If search finds nothing permitted, no LLM call is made.
 
-The model is `claude-opus-5-5`, configurable with `ANTHROPIC_MODEL`. I did not add the server-side refusal fallback
-option; a refused request just returns an error.
+## LLM provider
+
+Provider-agnostic through LangChain: `init_chat_model(LLM_MODEL)` with `LLM_MODEL="<provider>:<model>"`, and
+`with_structured_output(<pydantic model>, method="json_schema")` for the JSON. Switching provider is a `.env` change.
+Anthropic and OpenAI adapters are installed; another provider is one extra `langchain-<provider>` package.
+
+Why LangChain and not LiteLLM or a hand-written adapter: we only need "chat call that returns a validated Pydantic
+object", and LangChain's structured output does that the same way across providers. LiteLLM is lighter, but structured
+output support differs per provider and we'd be validating JSON ourselves. A hand-written adapter is fine for two
+providers and becomes our problem for the third. Only `langchain-core` features are used, no chains or agents.
+
+`method="json_schema"` uses each provider's native structured output instead of a forced tool call; recent Claude
+models reject forced tool calls.
+
+Default is `anthropic:claude-opus-5-5`, since I had to pick one for the placeholder key.
 
 ## Work orders
 
@@ -81,10 +99,11 @@ sent anywhere else.
 
 ## Eval
 
-Each of the 10 questions runs through the same pipeline as the UI. Claude grades the answer against the reference:
+Each of the 10 questions runs through the same pipeline as the UI. An LLM grades the answer against the reference:
 correct only if every decision-relevant fact in the reference is there (values, part numbers, conditions, the
-"don't do X" parts) and nothing contradicts it. Extra correct detail is fine. The judge is the same model family
-as the answerer, which is a known bias; the per-question reasons are saved so a person can check the grading.
+"don't do X" parts) and nothing contradicts it. Extra correct detail is fine. By default the judge is the same model
+as the answerer, which is a known bias (`JUDGE_MODEL` can point it elsewhere); the per-question reasons are saved so a
+person can check the grading.
 
 ## Cut
 

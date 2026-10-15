@@ -5,5 +5,5 @@ __pycache__/
 .env
 .pytest_cache/
 eval_results/
-guide.pdf
 data/
+guide.pdf

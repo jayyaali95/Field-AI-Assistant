@@ -12,4 +12,4 @@ COPY copilot ./copilot
 COPY tests ./tests
 
 EXPOSE 8000
-CMD ["uvicorn", "copilot.api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "python -m copilot.ingest --if-empty && exec uvicorn copilot.api:app --host 0.0.0.0 --port 8000"]
