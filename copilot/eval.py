@@ -31,6 +31,11 @@ partially_correct: right direction and nothing unsafe, but at least one required
 incorrect: a required action is missing or wrong, a value contradicts the reference, or the answer contains something
 the reference rules out (for example steps the technician isn't certified for, or a value for a different model).
 
+A statement about something the reference doesn't mention is not wrong unless it conflicts with the reference.
+The copilot cites the company's records, so extra history can be true even if the reference leaves it out.
+A work order is for whoever will do the job: naming the procedure number a certified technician must follow is
+not giving the steps, as long as the answer doesn't spell those steps out.
+
 If the reference says no source covers the question, the answer is correct only if it says so and does not offer
 the wrong value as the answer."""
 

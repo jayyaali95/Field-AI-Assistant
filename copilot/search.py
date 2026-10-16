@@ -13,6 +13,7 @@ from . import config
 from .text import normalize
 
 ASSET_ID = re.compile(r"\b[A-Z]{3}-[A-Z]-\d{4}\b", re.I)
+SHORT_DOCUMENT = 3  # chunks; bulletins and short email threads
 
 # BM25 (k1 = 1.2, b = 0.2) in SQL. Postgres' own ts_rank has no IDF, so "case" (stemmed from "casing")
 # counted as much as "hcp200". Term frequency comes from the positions stored in the tsvector.
@@ -76,12 +77,41 @@ def retrieve(conn: psycopg.Connection, question: str, groups: list[str], limit: 
     extra += [a[-4:] for a in ASSET_ID.findall(question)]
     query = f"{question} {' '.join(extra)}"
     hits = search(conn, query, groups, limit=limit)
+    best = hits[0].score if hits else 0.0
+    hits = with_whole_short_documents(conn, hits, groups)
     known = {h.id for h in hits}
 
     return Retrieval(
         hits=[a for a in assets if a.id not in known] + hits,
-        missing_certifications=missing_certifications(conn, query, groups, best=hits[0].score if hits else 0.0),
+        missing_certifications=missing_certifications(conn, query, groups, best=best),
     )
+
+
+def with_whole_short_documents(conn: psycopg.Connection, hits: list[Hit], groups: list[str]) -> list[Hit]:
+    """A hit on a document of up to SHORT_DOCUMENT chunks brings in the rest of it, in order.
+
+    Bulletins are two or three pages and the page that matches the question is often not the one with the
+    action: SB-2025-014 names the alarm on page 1 and the 15% stuck-valve rule on page 2.
+    """
+    rows = conn.execute(
+        """SELECT c.id, d.path, d.title, d.source_system, d.note, d.required_groups, c.location, c.text
+           FROM chunks c JOIN documents d ON d.id = c.document_id
+           WHERE d.path = ANY(%s) AND d.required_groups <@ %s::text[]
+             AND (SELECT count(*) FROM chunks x WHERE x.document_id = d.id) <= %s
+           ORDER BY c.id""",
+        (list({h.path for h in hits}), list(groups), SHORT_DOCUMENT),
+    ).fetchall()
+    whole = {}
+    for row in rows:
+        whole.setdefault(row["path"], []).append(Hit(**row))
+
+    out, seen = [], set()
+    for hit in hits:
+        for h in whole.get(hit.path, [hit]):
+            if h.id not in seen:
+                seen.add(h.id)
+                out.append(h)
+    return out
 
 
 def missing_certifications(conn: psycopg.Connection, query: str, groups: list[str], best: float) -> list[str]:

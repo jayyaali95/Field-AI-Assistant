@@ -92,6 +92,9 @@ Only "correct" counts toward the score. The judge's reasons, the answers, citati
 to `eval_results/eval-<timestamp>.json`. The judge defaults to the answering model; set `JUDGE_MODEL` to grade with a
 different one.
 
+Last runs with `openai:gpt-5`: 9/10, 8/10, 8/10 correct. Scores vary by one or two questions between runs. The run history, what each
+miss was and what changed is in [decisions.md](decisions.md#eval).
+
 ## Tests
 
 ```bash
@@ -107,3 +110,18 @@ reference answer needs. It takes about two minutes (OCR). For a quick run:
 ```bash
 docker compose run --rm api pytest --ignore tests/test_retrieval_corpus.py
 ```
+
+## Where AI was used
+
+- **Writing the code and docs.** Claude Code (Claude Opus) wrote the code, tests and docs, one PR at a time from
+  [plan.md](plan.md). Each PR was reviewed and committed by hand before the next one started. Some calls were made
+  in review, not by the AI: Docker only (nothing installed on the host), provider-agnostic LLM access instead of
+  one hard-coded provider, and keeping the candidate data out of git.
+- **Reading the corpus.** The AI read the whole data package to find the traps (the unlisted unofficial HV copy,
+  the empty checklist, the duplicate manual, the corrupt bulletin page, the scanned manual, the conflicting
+  sources). The file problems are handled at ingest and tested; the conflicts are handled by the precedence rules in
+  the prompt.
+- **Tuning.** Search settings were picked by checking retrieval for each eval question (`tests/test_retrieval_corpus.py`).
+  Prompt changes came from reading the misses in eval runs. Both are listed in [decisions.md](decisions.md).
+- **In the product.** An LLM writes the answer and the work order draft from the retrieved sources, and grades the
+  eval. Permissions, the citation check and work order approval are plain code, not the model.

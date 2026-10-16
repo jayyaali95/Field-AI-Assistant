@@ -71,6 +71,15 @@ def test_asset_short_number_matches_how_people_write_it(indexed):
     assert retrieve(conn, "TAC-C-0142 has E-14, seen before?", TECH).hits
 
 
+def test_hit_on_a_short_document_brings_in_the_rest_of_it(indexed):
+    bulletin = "<div id='main-content'><h2>Symptom</h2><p>L-03 low suction alarm</p><h2>Diagnosis</h2><p>Position below 15%: valve stuck</p></div>"
+    long_page = "<div id='main-content'><h2>Alarms</h2><p>L-03 seen in winter</p>" + "".join(f"<h2>Part {i}</h2><p>other note {i}</p>" for i in range(3)) + "</div>"
+    conn = indexed({"corpus/bulletin.html": (bulletin, []), "corpus/wiki.html": (long_page, [])})
+    hits = retrieve(conn, "L-03 alarm", TECH).hits
+    assert [h.location for h in hits if h.path == "corpus/bulletin.html"] == ["Symptom", "Diagnosis"]
+    assert [h.location for h in hits if h.path == "corpus/wiki.html"] == ["Alarms"]
+
+
 def test_rare_codes_outweigh_common_words(indexed):
     common = " ".join(["check the unit and check the case"] * 5)
     files = {f"corpus/filler{i}.html": (page(f"{common} page {i}"), []) for i in range(5)}  # unique, so not deduped

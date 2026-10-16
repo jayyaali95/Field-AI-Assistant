@@ -31,6 +31,9 @@ The query is an OR of all terms. Ranking is BM25, written in SQL on top of the P
 - Length normalization is low (b = 0.2). Chunks range from one CSV row to a whole procedure section, and with the
   usual 0.75 the HV-PROC-07 procedure section lost to its own revision history.
 - At most 4 chunks per document, 20 in total, so one big export can't fill the context.
+- A hit on a document of three chunks or fewer (bulletins, short email threads) brings in the whole document. The
+  page that matches is often not the page with the action: SB-2025-014 names the L-03 alarm on page 1 and gives the
+  "position below 15%" rule on page 2, and the first eval run missed it.
 
 These settings were picked by checking, for each eval question, whether the sources the reference answer depends on
 are retrieved for that user. That check is a test (`tests/test_retrieval_corpus.py`) so ranking changes can't quietly
@@ -116,7 +119,8 @@ providers and becomes our problem for the third. Only `langchain-core` features 
 `method="json_schema"` uses each provider's native structured output instead of a forced tool call; recent Claude
 models reject forced tool calls.
 
-Default is `anthropic:claude-opus-5-5`, since I had to pick one for the placeholder key.
+The default in `.env.example` is `anthropic:claude-opus-5-5`, since I had to pick one for the placeholder key. The
+eval below was run with `openai:gpt-5`, because that's the key we had. Nothing in the code changed for that.
 
 ## Work orders
 
@@ -133,6 +137,54 @@ correct only if every decision-relevant fact in the reference is there (values, 
 "don't do X" parts) and nothing contradicts it. Extra correct detail is fine. By default the judge is the same model
 as the answerer, which is a known bias (`JUDGE_MODEL` can point it elsewhere); the per-question reasons are saved so a
 person can check the grading.
+
+Results with `openai:gpt-5` as answerer and judge:
+
+| Run | Score | What changed before it |
+|---|---|---|
+| 1 | 5/10 correct, 4 partial | first run |
+| 2 | 9/10, 1 partial | short-document rule, prompt rules 4-6, judge note on extra history |
+| 3 | 8/10, 1 partial, 1 incorrect | asset history rule |
+| 4 | 8/10, 1 partial, 1 incorrect | judge note on work orders |
+
+What the first run missed, and why:
+- q02 gave the clearance but not "above the limit, replace the wear ring". The page was retrieved; the model
+  stopped at the number. Rule 6 now asks for the out-of-limit action.
+- q08 listed the history but not the cause: the TS-2 harness runs along the freezer exhaust duct (Tacoma site notes,
+  retrieved). Rule 5 now asks for why it keeps coming back.
+- q09 missed the 15% rule (page 2 of the bulletin wasn't retrieved, fixed above) and didn't name the KT-WI-14 vs
+  SOP-020 conflict. Rule 4 now asks to name the conflict and what each document says.
+- q04 was graded incorrect because the answer said the pump was refitted at 38 N-m in June and ran dry. That's true
+  (case 00041988); the judge took it as contradicting the reference. The judge prompt now says a fact the reference
+  doesn't mention is only wrong if it conflicts with it. The answer did miss that 45 N-m cracked this pump's casing,
+  so rule 5 asks for relevant past jobs on the asset.
+- q05 missed "open a High case" in one run and "notify the site" in another. Same prompt, different run: with a long
+  procedure the model drops a different step each time.
+
+Run 3 failed q06 because the work order said "reset per HV-PROC-07". That work order is for the HV technician who
+will do the job, and the Work Order Writing Guide asks for procedure numbers, so the judge prompt now says that
+naming the procedure isn't giving the steps. Two of the judge changes made it less strict. I read the answers
+behind both and agree with them, but it's still me adjusting the grader after seeing results, so the reasons are
+written here and the per-question grades are in `eval_results/`.
+
+Run 4's two misses show both problems. q02 was marked incorrect for saying "replace the wear rings" (plural) where
+the reference says "wear ring". The manual itself says "the wear rings are to be renewed", so this is the judge being
+wrong. q08 is a real miss: this time the answer left out the harness routing, which it included in runs 2 and 3.
+I stopped tuning there. Another prompt change aimed at one question would be chasing noise on ten questions.
+
+Scores move by one or two questions between runs with no code change. Ten questions run once is not enough to
+tell a real improvement from noise. With more time: run each question three to five times and report the spread.
+
+## Another week
+
+- Check claims, not only citations: for each sentence, confirm its values and part numbers appear in the cited
+  source, and flag the ones that don't.
+- Better OCR for the 1998 scan (the p. 3 casing torque is still lost), or a vision model for image-only pages.
+- More eval questions, from real technician questions, each run several times. Split them so prompt changes are tuned
+  on some and scored on others.
+- Hybrid search (keyword plus embeddings) once there are questions written in plain language without codes.
+- Edit a work order draft before approval, and push approved ones to Salesforce.
+- Real login instead of the user picker.
 
 ## Cut
 

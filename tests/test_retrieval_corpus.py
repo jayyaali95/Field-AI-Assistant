@@ -11,7 +11,7 @@ from copilot.search import retrieve
 # question id -> (title contains, location contains) that must be in the results
 NEEDED = {
     "q01": [("HCP-500 IOM Rev B", "p. 9")],
-    "q02": [("HCP-200", "p. 3")],
+    "q02": [("HCP-200", "p. 3"), ("HCP-200", "p. 6")],
     "q03": [("VRS-75 Service Manual Rev C", "p. 2")],
     "q04": [("SB-2025-009", ""), ("Salesforce cases NA", "00041988"), ("Fleet register", "FRS-P-0031")],
     "q05": [("HV-PROC-07", "6. Procedure"), ("HV-PROC-07", "7. Repeat trips")],
@@ -19,7 +19,7 @@ NEEDED = {
     "q07": [("Belton BX-12 O&M Manual", "p. 8")],
     "q08": [("SB-2026-003", ""), ("Teams", "2026-07-02"), ("Tacoma Site Notes", ""),
             ("Salesforce cases NA", "00041207"), ("Salesforce cases NA", "00042388"), ("Salesforce cases NA", "00044010")],
-    "q09": [("SB-2025-014", ""), ("FW: RTM-H-0007", "Sofie"), ("KT-WI-14", ""), ("Fleet register", "RTM-H-0007")],
+    "q09": [("SB-2025-014", "p. 2"), ("FW: RTM-H-0007", "Sofie"), ("KT-WI-14", ""), ("Fleet register", "RTM-H-0007")],
     "q10": [("RE: BX-12 tracking", "Henrik Sauer")],
 }
 
