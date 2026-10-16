@@ -1,6 +1,6 @@
 # Field Service Copilot
 
-A copilot for Corvane field technicians. It answers questions from Corvane's documents, only from the ones the
+A copilot for field technicians. It answers questions from documents, only from the ones the
 technician is allowed to see, cites a source for every claim, and drafts a work order for a supervisor to approve.
 
 See [plan.md](plan.md) for the build plan and [decisions.md](decisions.md) for the choices and tradeoffs.
