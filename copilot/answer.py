@@ -121,9 +121,10 @@ def answer(
     result = ask_llm(SYSTEM, build_prompt(user, question, found.hits, found.missing_certifications))
     text, citations = _check_citations(result.answer, found.hits)
     covered = result.covered and bool(citations)
+    work_order = result.work_order
     if result.covered and not citations:  # claims coverage but cites nothing we gave it
-        text = NOT_COVERED
-    return Answer(covered, text, citations, found.missing_certifications, result.work_order)
+        text, work_order = NOT_COVERED, None  # a draft built on that answer is just as ungrounded
+    return Answer(covered, text, citations, found.missing_certifications, work_order)
 
 
 def _check_citations(text: str, hits: list[Hit]) -> tuple[str, list[Citation]]:
@@ -139,5 +140,7 @@ def _check_citations(text: str, hits: list[Hit]) -> tuple[str, list[Citation]]:
             used[n] = Citation(f"S{n}", h.title, h.location, h.path, h.source_system, h.text[:600])
         return match.group(0)
 
+    # "[S1, S3]" -> "[S1][S3]", so both styles are checked the same way
+    text = re.sub(r"\[(S\d+(?:\s*,\s*S\d+)+)\]", lambda m: "".join(f"[{s.strip()}]" for s in m.group(1).split(",")), text)
     text = re.sub(r"\[S(\d+)\]", keep, text)
     return text.strip(), list(used.values())

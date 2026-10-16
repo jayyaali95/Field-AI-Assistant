@@ -24,6 +24,9 @@ def _runnable(model: str, schema: type[BaseModel]):
 def structured(system: str, prompt: str, schema: type[T], model: str = config.LLM_MODEL) -> T:
     """One chat call that returns a validated instance of `schema`."""
     try:
-        return _runnable(model, schema).invoke([("system", system), ("human", prompt)])
+        result = _runnable(model, schema).invoke([("system", system), ("human", prompt)])
     except Exception as error:  # providers raise their own exception types; callers only need to know it failed
         raise LLMError(f"{type(error).__name__}: {error}") from error
+    if result is None:  # some adapters return None instead of raising when the model refuses or runs out of tokens
+        raise LLMError("The model returned no structured output")
+    return result

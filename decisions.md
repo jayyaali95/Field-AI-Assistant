@@ -127,7 +127,8 @@ eval below was run with `openai:gpt-5`, because that's the key we had. Nothing i
 Fields follow the Work Order Writing Guide: asset, fault code, summary, work steps (procedure numbers, not copied
 steps), parts, certification required, estimated hours, priority, campaign code. Saved as `draft`. Only users in
 `role-lead` can approve or reject, matching FS-STD-001 6.2 (supervisor approval; in the EU the team lead is the
-supervisor). Approval flips the status; in a real deployment that's where it would be pushed to Salesforce. Nothing is
+supervisor). Leads see every work order; a technician sees only their own, because a draft is written from the
+requester's sources and can carry detail from documents others may not see. Approval flips the status; in a real deployment that's where it would be pushed to Salesforce. Nothing is
 sent anywhere else.
 
 ## Eval

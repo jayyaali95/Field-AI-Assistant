@@ -75,9 +75,10 @@ class Decision(BaseModel):
 
 
 @app.get("/work-orders")
-def list_work_orders() -> list[dict]:
+def list_work_orders(user_id: str) -> list[dict]:
+    user = get_user(user_id)
     with db.connect() as conn:
-        return workorders.list_all(conn)
+        return workorders.list_for(conn, user)
 
 
 @app.post("/work-orders/{work_order_id}/decision")

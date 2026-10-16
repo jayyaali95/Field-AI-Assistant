@@ -75,6 +75,22 @@ def test_covered_answer_without_valid_citations_becomes_not_covered(library):
     assert result.text == NOT_COVERED
 
 
+def test_both_citation_styles_are_checked(library):
+    llm = FakeLLM(ModelAnswer(covered=True, answer="It's HV work [S1, S9].", work_order=None))
+    result = answer(library, PRIYA, "How do I reset E-31?", ask_llm=llm)
+    assert result.text == "It's HV work [S1]."
+    assert [c.marker for c in result.citations] == ["S1"]
+
+
+def test_draft_is_dropped_when_the_answer_cites_nothing_real(library):
+    draft = WorkOrderDraft(
+        asset_id=None, fault_code=None, summary="Restart", work_steps=[], parts=[],
+        certification_required=["None"], estimated_hours=None, priority="Low", campaign_code=None,
+    )
+    llm = FakeLLM(ModelAnswer(covered=True, answer="Just restart it [S7].", work_order=draft))
+    assert answer(library, PRIYA, "How do I reset E-31?", ask_llm=llm).work_order is None
+
+
 def test_work_order_draft_is_passed_through(library):
     draft = WorkOrderDraft(
         asset_id="TAC-C-0143", fault_code="E-31", summary="E-31, needs HV reset", work_steps=["Reset per HV-PROC-07"],

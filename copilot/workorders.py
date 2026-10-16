@@ -29,8 +29,12 @@ def save_draft(conn: psycopg.Connection, user: User, question: str, draft: WorkO
     return row
 
 
-def list_all(conn: psycopg.Connection) -> list[dict]:
-    return conn.execute("SELECT * FROM work_orders ORDER BY id DESC").fetchall()
+def list_for(conn: psycopg.Connection, user: User) -> list[dict]:
+    """Leads see every work order, to approve them. A technician sees only their own: a draft is written from
+    the requester's sources, which can include documents other technicians may not see."""
+    if user.is_lead:
+        return conn.execute("SELECT * FROM work_orders ORDER BY id DESC").fetchall()
+    return conn.execute("SELECT * FROM work_orders WHERE requested_by = %s ORDER BY id DESC", (user.id,)).fetchall()
 
 
 def decide(conn: psycopg.Connection, work_order_id: int, user: User, approve: bool) -> dict:

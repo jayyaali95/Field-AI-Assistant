@@ -102,8 +102,8 @@ with ask_tab:
 
 with orders_tab:
     if not user["is_lead"]:
-        st.caption("Only team leads can approve or reject. Switch to Lena Hoffmann or Kenji Watanabe to approve.")
-    work_orders = api("GET", "/work-orders") or []
+        st.caption("Your work orders. Only team leads can approve or reject; switch to Lena Hoffmann or Kenji Watanabe.")
+    work_orders = api("GET", "/work-orders", params={"user_id": user_id}) or []
     if not work_orders:
         st.write("No work orders yet.")
     for work_order in work_orders:

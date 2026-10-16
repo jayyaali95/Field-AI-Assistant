@@ -50,7 +50,7 @@ The output lists every file that was skipped and why (empty, not in permissions.
 - `POST /ask` with `{"user_id": "u03", "question": "TAC-C-0143 tripped on E-31. How do I reset it?"}`: returns
   `covered`, `answer` (with `[S#]` markers), `citations` (title, location, path, excerpt per marker),
   `missing_certifications` and the `work_order` draft it saved, or null
-- `GET /work-orders`: all work orders, newest first
+- `GET /work-orders?user_id=u03`: newest first. Team leads see all of them, a technician sees only their own
 - `POST /work-orders/{id}/decision` with `{"user_id": "u08", "approve": true}`: approve or reject a draft. Only team
   leads (`role-lead`: u07, u08) may decide, and only once (403 / 409 otherwise)
 

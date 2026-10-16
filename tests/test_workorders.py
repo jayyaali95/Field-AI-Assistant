@@ -34,14 +34,22 @@ def test_answer_with_follow_up_saves_a_draft(client):
     assert work_order["status"] == "draft" and work_order["requested_by"] == "u03"
     assert work_order["draft"]["certification_required"] == ["HV"]
     assert work_order["sources"] == [{"title": "playbook", "location": "Intro", "path": "corpus/playbook.html"}]
-    assert [w["id"] for w in client.get("/work-orders").json()] == [work_order["id"]]
+    assert [w["id"] for w in client.get("/work-orders", params={"user_id": "u03"}).json()] == [work_order["id"]]
+
+
+def test_technicians_see_only_their_own_work_orders_and_leads_see_all(client):
+    work_order = ask(client, "u02")["work_order"]  # Daniel's draft can carry HV detail Priya may not see
+    listed = lambda user_id: [w["id"] for w in client.get("/work-orders", params={"user_id": user_id}).json()]
+    assert listed("u02") == [work_order["id"]]
+    assert listed("u03") == []
+    assert listed("u08") == [work_order["id"]]
 
 
 def test_technician_cannot_approve_even_their_own_draft(client):
     work_order = ask(client)["work_order"]
     response = decide(client, work_order["id"], "u03")
     assert response.status_code == 403
-    assert client.get("/work-orders").json()[0]["status"] == "draft"
+    assert client.get("/work-orders", params={"user_id": "u08"}).json()[0]["status"] == "draft"
 
 
 def test_team_lead_approves_once(client):
@@ -63,7 +71,7 @@ def test_unknown_work_order(client):
 def test_answer_without_follow_up_saves_nothing(client, monkeypatch):
     monkeypatch.setattr(llm, "structured", lambda s, p, schema: ModelAnswer(covered=True, answer="Clean the strainer [S1].", work_order=None))
     assert ask(client)["work_order"] is None
-    assert client.get("/work-orders").json() == []
+    assert client.get("/work-orders", params={"user_id": "u03"}).json() == []
 
 
 def test_decide_checks_role_before_touching_the_row(conn):
